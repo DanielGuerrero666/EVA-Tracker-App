@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>EVA Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="card">
+    <div class="brand brand-compact">
+      <img src="assets/logo.svg" alt="EVA Tracker" class="logo logo-small" />
+    </div>
+
+    <div class="header">
+      <div>
+        <div class="user-name" id="user-name"></div>
+        <div class="user-email" id="user-email"></div>
+      </div>
+      <button class="link" id="logout-btn">Switch user</button>
+    </div>
+
+    <div class="time-card">
+      <div class="time-date" id="time-date"></div>
+      <div class="time-value" id="time-value">00:00:00</div>
+    </div>
+
+    <div class="error" id="error"></div>
+
+    <div class="actions">
+      <div class="action">
+        <div class="action-label" id="clock-label">&nbsp;</div>
+        <button id="toggle-btn" class="btn-clockin"></button>
+      </div>
+      <div class="action">
+        <div class="action-label" id="break-timer">01:00:00</div>
+        <button id="break-btn" class="btn-break">Start Break</button>
+      </div>
+    </div>
+
+    <div class="history-title">Shift history</div>
+    <ul class="history-list" id="history-list"></ul>
+  </div>
+
+  <script src="tracker.js"></script>
+</body>
+</html>
