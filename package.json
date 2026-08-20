@@ -1,0 +1,53 @@
+{
+  "name": "control-asistencia",
+  "version": "1.0.0",
+  "description": "Control de Asistencia — Entrada / Descanso / Salida, sin contraseñas para el empleado.",
+  "main": "main.js",
+  "author": "Elite VA Consulting",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.elitevaconsulting.control-asistencia",
+    "productName": "Control de Asistencia",
+    "protocols": {
+      "name": "Control de Asistencia",
+      "schemes": ["asistencia"]
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "config.js",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "renderer/icono.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Control de Asistencia"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "renderer/icono.png"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "renderer/icono.png"
+    }
+  }
+}

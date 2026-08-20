@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Invitación — Control de Asistencia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{--dorado:#A36F06;--ivory:#FAFAFA;--black:#0C0C0C;
+        --grey:#6B6B6B;--linea:#E4E4E7;--verde:#00966E;--rojo:#D62612}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Poppins',system-ui,sans-serif;background:var(--ivory);
+       color:var(--black);min-height:100vh;display:flex;align-items:center;
+       justify-content:center;padding:24px}
+  .caja{max-width:460px;width:100%;background:#fff;border:1px solid var(--linea);
+        border-radius:18px;padding:36px 32px;text-align:center}
+  .logo{height:52px;width:auto;margin:0 auto 20px;display:block}
+  h1{font-size:21px;font-weight:700;color:var(--dorado);margin-bottom:8px}
+  .sub{font-size:14px;color:var(--grey);margin-bottom:26px;line-height:1.6}
+  .sub b{color:var(--black);font-weight:500}
+  .btn{display:block;width:100%;padding:15px;border:none;border-radius:11px;
+       font-family:inherit;font-size:15px;font-weight:500;cursor:pointer;
+       text-decoration:none;margin-bottom:11px;transition:opacity .15s}
+  .btn:hover{opacity:.87}
+  .btn-p{background:var(--dorado);color:#fff}
+  .btn-s{background:transparent;color:var(--grey);border:1px solid var(--linea)}
+  .paso{text-align:left;background:#F8F8FA;border-radius:11px;padding:18px;
+        margin-top:22px;font-size:13px;color:var(--grey);line-height:1.65}
+  .paso b{color:var(--black);font-weight:500;display:block;margin-bottom:7px}
+  .codigo{background:#fff;border:1px solid var(--linea);border-radius:8px;
+          padding:11px;font-family:ui-monospace,monospace;font-size:11.5px;
+          word-break:break-all;margin:10px 0;user-select:all;line-height:1.5}
+  .estado{padding:13px;border-radius:10px;font-size:13.5px;margin-bottom:20px;line-height:1.55}
+  .err{background:#FEF2F2;color:var(--rojo)}
+  .ok{background:#F0FDF4;color:var(--verde)}
+  .info{background:#F8F8FA;color:var(--grey)}
+  .oculto{display:none}
+  .pie{font-size:11.5px;color:#9A9AA0;margin-top:22px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="caja">
+  <img class="logo" src="/logo-icono.svg" alt="Elite VA Consulting">
+
+  <div id="cargando">
+    <h1>Verificando invitación…</h1>
+  </div>
+
+  <div id="invalida" class="oculto">
+    <h1>Enlace no válido</h1>
+    <div id="motivo" class="estado err"></div>
+    <p class="sub">Pídele a tu administrador que te genere un enlace nuevo.</p>
+  </div>
+
+  <div id="valida" class="oculto">
+    <h1>Bienvenido, <span id="nombre"></span></h1>
+    <p class="sub">Tu cuenta está lista en <b id="correo"></b>.<br>¿Ya tienes la aplicación instalada en este equipo?</p>
+
+    <button id="btnAbrir" class="btn btn-p">Sí, ábrela</button>
+    <a class="btn btn-s" href="/descargas/instalador.exe">No, descárgala primero</a>
+
+    <div id="msgAbrir" class="oculto"></div>
+
+    <div class="paso">
+      <b>¿No se abrió al hacer click en "Sí, ábrela"?</b>
+      Instala la aplicación, ábrela y pega este código en la pantalla de activación:
+      <div class="codigo" id="codigo"></div>
+      Servidor: <span class="codigo" style="display:inline-block;padding:4px 8px"
+                      id="servidor"></span>
+    </div>
+
+    <p class="pie">
+      Este enlace es de un solo uso y expira pronto.<br>
+      No lo reenvíes a nadie más.
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  var token = location.pathname.split('/invitacion/')[1] || '';
+  var servidor = location.origin;
+
+  function mostrar(id) {
+    ['cargando', 'invalida', 'valida'].forEach(function (s) {
+      document.getElementById(s).classList.toggle('oculto', s !== id);
+    });
+  }
+
+  fetch('/api/invitacion/' + encodeURIComponent(token))
+    .then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok) throw new Error(d.detail || 'Este enlace no es válido.');
+        return d;
+      });
+    })
+    .then(function (datos) {
+      document.getElementById('nombre').textContent = datos.nombre.split(' ')[0];
+      document.getElementById('correo').textContent = datos.email;
+      document.getElementById('codigo').textContent = token;
+      document.getElementById('servidor').textContent = servidor;
+      mostrar('valida');
+
+      var destino = 'asistencia://activar?servidor=' +
+                    encodeURIComponent(servidor) +
+                    '&token=' + encodeURIComponent(token);
+
+      // No intentamos abrir el protocolo automáticamente: si la app no
+      // está instalada, el navegador muestra un error confuso ("no se
+      // puede abrir este enlace"). Solo lo intentamos cuando la persona
+      // confirma explícitamente que ya la tiene instalada.
+      document.getElementById('btnAbrir').addEventListener('click', function () {
+        window.location.href = destino;
+        document.getElementById('msgAbrir').classList.remove('oculto');
+        document.getElementById('msgAbrir').className = 'estado info';
+        document.getElementById('msgAbrir').textContent =
+          '¿No pasó nada? Pega el código de abajo en la aplicación manualmente.';
+      });
+    })
+    .catch(function (err) {
+      document.getElementById('motivo').textContent = err.message;
+      mostrar('invalida');
+    });
+})();
+</script>
+</body>
+</html>

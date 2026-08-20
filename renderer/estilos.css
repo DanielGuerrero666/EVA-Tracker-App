@@ -1,0 +1,224 @@
+/* Control de Asistencia — estilos
+   Paleta Elite VA Consulting: dorado #A36F06 (color exacto del logo oficial), negro y blanco */
+
+:root {
+  --dorado: #A36F06;
+  --ivory: #FAFAFA;
+  --black: #0C0C0C;
+  --grey: #6B6B6B;
+  --grey-claro: #9A9AA0;
+  --linea: #E4E4E7;
+  --verde: #00966E;
+  --naranja: #FF6820;
+  --rojo: #D62612;
+  --amarillo: #FEAD0F;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--ivory);
+  color: var(--black);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.pantalla { padding: 20px 18px 32px; }
+.oculta { display: none !important; }
+
+/* ---------- Marca ---------- */
+.marca { text-align: center; margin: 40px 0 28px; }
+.logo { height: 56px; width: auto; margin: 0 auto 14px; display: block; }
+.marca h1 { font-size: 19px; font-weight: 700; color: var(--dorado); }
+
+/* ---------- Barra superior ---------- */
+.barra {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 18px;
+}
+.saludo { font-size: 15px; font-weight: 500; }
+.fecha { font-size: 12px; color: var(--grey); text-transform: capitalize; margin-top: 1px; }
+.titulo-seccion { font-size: 17px; font-weight: 700; color: var(--dorado); }
+
+/* ---------- Reloj ---------- */
+.reloj {
+  font-size: 40px; font-weight: 700; color: var(--dorado);
+  text-align: center; letter-spacing: 1px;
+  font-variant-numeric: tabular-nums; margin-bottom: 14px;
+}
+
+/* ---------- Estado ---------- */
+.estado { text-align: center; margin-bottom: 20px; }
+.punto {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  margin-right: 7px; vertical-align: middle; background: var(--grey-claro);
+}
+.estado-texto { font-size: 14px; font-weight: 500; }
+.estado-detalle { font-size: 12px; color: var(--grey); margin-top: 4px; }
+
+/* ---------- Botones de marcación ---------- */
+.botones { display: grid; gap: 10px; margin-bottom: 22px; }
+
+.btn-marcar {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 20px 16px; border: none; border-radius: 14px;
+  font-family: inherit; color: #fff; cursor: pointer;
+  transition: transform .08s, opacity .15s;
+}
+.btn-marcar:active:not(:disabled) { transform: scale(.985); }
+.btn-marcar:disabled { opacity: .32; cursor: not-allowed; }
+
+.btn-titulo { font-size: 17px; font-weight: 700; letter-spacing: .2px; }
+.btn-sub { font-size: 11px; font-weight: 400; opacity: .9; }
+
+.btn-marcar.entrada  { background: var(--verde); }
+.btn-marcar.descanso { background: var(--naranja); }
+.btn-marcar.salida   { background: var(--rojo); }
+
+/* ---------- Botones comunes ---------- */
+.btn-primario, .btn-secundario {
+  width: 100%; padding: 13px; border: none; border-radius: 10px;
+  font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
+  transition: opacity .15s;
+}
+.btn-primario { background: var(--dorado); color: #fff; }
+.btn-secundario {
+  background: transparent; color: var(--grey);
+  border: 1px solid var(--linea);
+}
+.btn-primario:hover, .btn-secundario:hover { opacity: .85; }
+.btn-primario:disabled { opacity: .5; cursor: not-allowed; }
+
+.btn-icono {
+  width: 32px; height: 32px; border: 1px solid var(--linea); border-radius: 8px;
+  background: transparent; color: var(--grey); font-size: 15px; cursor: pointer;
+}
+
+/* ---------- Tarjetas ---------- */
+.tarjeta {
+  background: #fff; border: 1px solid var(--linea); border-radius: 14px;
+  padding: 18px; margin-bottom: 14px;
+}
+.tarjeta.compacta { padding: 16px 18px; }
+.tarjeta h2 { font-size: 14px; font-weight: 700; color: var(--dorado); margin-bottom: 12px; }
+
+.intro, .ayuda {
+  font-size: 12px; color: var(--grey); line-height: 1.55; margin-bottom: 14px;
+}
+.ayuda { margin: 6px 0 14px; }
+
+.ayuda-enlace { text-align: center; font-size: 12px; margin-top: 14px; }
+.ayuda-enlace a { color: var(--dorado); text-decoration: none; }
+.ayuda-enlace a:hover { text-decoration: underline; }
+
+/* ---------- Formularios ---------- */
+label {
+  display: block; font-size: 11px; font-weight: 500; color: var(--grey);
+  margin-bottom: 5px;
+}
+input[type=text], input[type=email], input[type=number], input[type=date] {
+  width: 100%; padding: 11px 12px; font-family: inherit; font-size: 14px;
+  border: 1px solid var(--linea); border-radius: 9px; margin-bottom: 14px;
+  background: #fff; color: var(--black); user-select: text;
+}
+input:focus { outline: none; border-color: var(--dorado); }
+
+.fila { display: flex; gap: 12px; }
+.fila > div { flex: 1; min-width: 0; }
+
+.check {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 13px; color: var(--black); font-weight: 400;
+  margin-bottom: 12px; cursor: pointer;
+}
+.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--dorado); }
+
+/* ---------- Progreso ---------- */
+.fila-progreso {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 7px;
+}
+.etiqueta { font-size: 12px; color: var(--grey); }
+.valor { font-size: 15px; font-weight: 700; color: var(--dorado); }
+
+.barra-progreso {
+  height: 7px; background: #F0F0F2; border-radius: 4px; overflow: hidden;
+}
+.relleno {
+  height: 100%; width: 0; border-radius: 4px; background: var(--verde);
+  transition: width .4s ease;
+}
+.relleno.descanso { background: var(--naranja); }
+.relleno.excedido { background: var(--rojo); }
+.meta { font-size: 11px; color: var(--grey-claro); margin-top: 5px; }
+
+/* ---------- Tablas ---------- */
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+th {
+  text-align: left; font-size: 10px; font-weight: 500; color: var(--grey);
+  text-transform: uppercase; letter-spacing: .4px;
+  padding: 7px 6px; border-bottom: 1px solid var(--linea);
+}
+td { padding: 9px 6px; border-bottom: 1px solid #F4F4F5; }
+tr:last-child td { border-bottom: none; }
+
+.vacio { text-align: center; color: var(--grey-claro); font-size: 12px; padding: 18px 0; }
+
+/* ---------- Mensajes ---------- */
+.msg {
+  padding: 11px 13px; border-radius: 9px; font-size: 12.5px;
+  margin-bottom: 14px; line-height: 1.5;
+}
+.msg.err { background: #FEF2F2; color: var(--rojo); }
+.msg.ok  { background: #F0FDF4; color: var(--verde); }
+.msg.avi { background: #FFFBEB; color: #92610A; }
+
+/* ---------- Lista de empleados ---------- */
+.empleado {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 10px; padding: 11px 0; border-bottom: 1px solid #F4F4F5;
+}
+.empleado:last-child { border-bottom: none; }
+.empleado-info { min-width: 0; flex: 1; }
+.empleado-nombre { font-size: 13px; font-weight: 500; }
+.empleado-meta {
+  font-size: 11px; color: var(--grey); margin-top: 2px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.acciones-emp { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-mini {
+  padding: 6px 10px; font-size: 11px; font-family: inherit;
+  border: 1px solid var(--linea); border-radius: 7px;
+  background: transparent; color: var(--grey); cursor: pointer;
+}
+.btn-mini:hover { border-color: var(--dorado); color: var(--dorado); }
+
+.etiqueta-chip {
+  display: inline-block; padding: 2px 7px; border-radius: 5px;
+  font-size: 10px; font-weight: 500; margin-left: 6px;
+}
+.chip-admin { background: #FBF0DC; color: var(--dorado); }
+.chip-pendiente { background: #FFFBEB; color: #92610A; }
+
+/* ---------- Enlace generado ---------- */
+.enlace-caja {
+  background: #F8F8FA; border: 1px solid var(--linea); border-radius: 9px;
+  padding: 12px; font-size: 11.5px; font-family: ui-monospace, monospace;
+  word-break: break-all; margin-bottom: 12px; user-select: text;
+  line-height: 1.5;
+}
+
+/* ---------- Modal ---------- */
+.modal {
+  position: fixed; inset: 0; background: rgba(12,12,12,.45);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  z-index: 100;
+}
+.modal-caja {
+  background: #fff; border-radius: 14px; padding: 22px;
+  width: 100%; max-width: 380px;
+}
+.modal-caja h2 { font-size: 15px; font-weight: 700; color: var(--dorado); margin-bottom: 16px; }
+.modal-acciones { display: flex; gap: 10px; margin-top: 6px; }

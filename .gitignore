@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Node / Electron
+node_modules/
+dist/
+
+# Logs y artefactos de ejecución local
+*.log
+
+# Entornos con secretos — nunca se suben
+.env
+*.env
+
+# Editor / SO / asistentes
+.vscode/
+.claude/
+.DS_Store
+Thumbs.db

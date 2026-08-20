@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>Control de Asistencia</title>
+<link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+
+<!-- ================= ACTIVACIÓN ================= -->
+<section id="pantallaActivacion" class="pantalla">
+  <div class="marca">
+    <img class="logo" src="logo-icono.svg" alt="Elite VA Consulting">
+    <h1>Control de Asistencia</h1>
+  </div>
+
+  <div class="tarjeta" id="tarjetaEmpleado">
+    <p class="intro">
+      Para empezar, abre el enlace de invitación que te envió tu administrador.
+      Si el enlace no abrió la aplicación, pega aquí el código que aparece en esa página.
+    </p>
+
+    <div id="msgActivacion"></div>
+
+    <label for="inCodigo">Código de invitación</label>
+    <input id="inCodigo" type="text" placeholder="Pega aquí el código">
+
+    <button id="btnActivar" class="btn-primario">Activar</button>
+
+    <p class="ayuda-enlace"><a href="#" id="lnkSoyAdmin">¿Eres administrador? Inicia sesión aquí</a></p>
+  </div>
+
+  <div class="tarjeta oculta" id="tarjetaAdmin">
+    <p class="intro">Inicia sesión con tu correo y contraseña de administrador.</p>
+
+    <div id="msgLoginAdmin"></div>
+
+    <label for="inEmailAdmin">Correo</label>
+    <input id="inEmailAdmin" type="email" placeholder="admin@empresa.com">
+
+    <label for="inPasswordLoginAdmin">Contraseña</label>
+    <input id="inPasswordLoginAdmin" type="password" placeholder="Contraseña">
+
+    <button id="btnLoginAdmin" class="btn-primario">Entrar</button>
+
+    <p class="ayuda-enlace"><a href="#" id="lnkSoyEmpleado">¿Eres empleado? Activa con tu código</a></p>
+  </div>
+</section>
+
+<!-- ================= MARCACIÓN ================= -->
+<section id="pantallaPrincipal" class="pantalla oculta">
+  <header class="barra">
+    <div>
+      <div class="saludo">Hola, <b id="nombreUsuario"></b></div>
+      <div class="fecha" id="fechaHoy"></div>
+    </div>
+    <button id="btnMenu" class="btn-icono" title="Opciones">⋯</button>
+  </header>
+
+  <div class="reloj" id="reloj">--:--:--</div>
+
+  <div class="estado" id="estadoCaja">
+    <span class="punto" id="punto"></span>
+    <span class="estado-texto" id="estadoTexto">Cargando…</span>
+    <div class="estado-detalle" id="estadoDetalle"></div>
+  </div>
+
+  <div id="msgMarcar"></div>
+
+  <!-- Los tres botones -->
+  <div class="botones">
+    <button id="btnEntrada" class="btn-marcar entrada" data-tipo="entrada">
+      <span class="btn-titulo">Entrada</span>
+      <span class="btn-sub">Iniciar jornada</span>
+    </button>
+    <button id="btnDescanso" class="btn-marcar descanso" data-tipo="descanso_inicio">
+      <span class="btn-titulo">Descanso</span>
+      <span class="btn-sub" id="subDescanso">Tomar descanso</span>
+    </button>
+    <button id="btnSalida" class="btn-marcar salida" data-tipo="salida">
+      <span class="btn-titulo">Salida</span>
+      <span class="btn-sub">Terminar jornada</span>
+    </button>
+  </div>
+
+  <!-- Progreso del día -->
+  <div class="tarjeta compacta">
+    <div class="fila-progreso">
+      <span class="etiqueta">Trabajado hoy</span>
+      <span class="valor" id="trabajadoHoy">0.00 h</span>
+    </div>
+    <div class="barra-progreso"><div class="relleno" id="barraTrabajo"></div></div>
+    <div class="meta" id="metaTrabajo"></div>
+
+    <div class="fila-progreso" style="margin-top:16px">
+      <span class="etiqueta">Descanso usado</span>
+      <span class="valor" id="descansoHoy">0 min</span>
+    </div>
+    <div class="barra-progreso"><div class="relleno descanso" id="barraDescanso"></div></div>
+    <div class="meta" id="metaDescanso"></div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Marcaciones de hoy</h2>
+    <div id="marcacionesHoy"></div>
+  </div>
+
+  <div class="tarjeta">
+    <h2>Últimos 14 días</h2>
+    <div id="historial"></div>
+  </div>
+
+  <button id="btnPanelAdmin" class="btn-secundario oculta">Panel de administración</button>
+</section>
+
+<!-- ================= ADMINISTRACIÓN ================= -->
+<section id="pantallaAdmin" class="pantalla oculta">
+  <header class="barra">
+    <h1 class="titulo-seccion">Administración</h1>
+    <div class="acciones-emp">
+      <button id="btnCerrarSesionAdmin" class="btn-icono" title="Cerrar sesión">⏻</button>
+      <button id="btnVolver" class="btn-icono" title="Volver">←</button>
+    </div>
+  </header>
+
+  <div id="msgAdmin"></div>
+
+  <!-- Alertas -->
+  <div id="alertas"></div>
+
+  <!-- Nuevo empleado -->
+  <div class="tarjeta">
+    <h2>Agregar empleado</h2>
+    <p class="ayuda">
+      Se genera un enlace de invitación. Envíaselo por correo o chat: al abrirlo,
+      la persona queda activada sin crear contraseña.
+    </p>
+
+    <label for="nvNombre">Nombre completo</label>
+    <input id="nvNombre" type="text" placeholder="Ana Gómez">
+
+    <label for="nvEmail">Correo corporativo</label>
+    <input id="nvEmail" type="email" placeholder="ana@empresa.com">
+
+    <div class="fila">
+      <div>
+        <label for="nvDepto">Departamento</label>
+        <input id="nvDepto" type="text" placeholder="Servicio">
+      </div>
+      <div>
+        <label for="nvJefe">Correo del jefe</label>
+        <input id="nvJefe" type="email" placeholder="jefe@empresa.com">
+      </div>
+    </div>
+
+    <div class="fila">
+      <div>
+        <label for="nvJornada">Jornada (horas)</label>
+        <input id="nvJornada" type="number" step="0.25" min="0.5" max="24" value="8">
+      </div>
+      <div>
+        <label for="nvDescanso">Descanso (minutos)</label>
+        <input id="nvDescanso" type="number" step="5" min="0" max="480" value="60">
+      </div>
+    </div>
+
+    <label class="check">
+      <input id="nvIncluye" type="checkbox" checked>
+      <span>La jornada ya incluye el descanso</span>
+    </label>
+    <p class="ayuda" id="ayudaJornada"></p>
+
+    <label class="check">
+      <input id="nvAdmin" type="checkbox">
+      <span>Dar permisos de administrador</span>
+    </label>
+
+    <div id="campoPasswordAdmin" class="oculta">
+      <label for="nvPassword">Contraseña de administrador</label>
+      <input id="nvPassword" type="password" placeholder="Mínimo 8 caracteres">
+    </div>
+
+    <button id="btnCrear" class="btn-primario">Crear y generar enlace</button>
+  </div>
+
+  <!-- Enlace generado -->
+  <div id="tarjetaEnlace" class="tarjeta oculta">
+    <h2>Enlace de invitación</h2>
+    <p class="ayuda">Válido por 7 días y de un solo uso.</p>
+    <div class="enlace-caja" id="enlaceGenerado"></div>
+    <button id="btnCopiar" class="btn-secundario">Copiar enlace</button>
+  </div>
+
+  <!-- Equipo -->
+  <div class="tarjeta">
+    <h2>Equipo</h2>
+    <div id="listaEmpleados"></div>
+  </div>
+
+  <!-- Exportar -->
+  <div class="tarjeta">
+    <h2>Exportar a Excel</h2>
+    <div class="fila">
+      <div>
+        <label for="exInicio">Desde</label>
+        <input id="exInicio" type="date">
+      </div>
+      <div>
+        <label for="exFin">Hasta</label>
+        <input id="exFin" type="date">
+      </div>
+    </div>
+    <button id="btnExportar" class="btn-primario">Descargar Excel</button>
+    <button id="btnExportarTodo" class="btn-secundario" style="margin-top:10px">
+      Ver Excel completo (todo el historial)
+    </button>
+  </div>
+</section>
+
+<!-- ================= EDITAR HORARIO ================= -->
+<div id="modalEditar" class="modal oculta">
+  <div class="modal-caja">
+    <h2 id="tituloEditar">Editar horario</h2>
+    <div id="msgEditar"></div>
+
+    <div class="fila">
+      <div>
+        <label for="edJornada">Jornada (horas)</label>
+        <input id="edJornada" type="number" step="0.25" min="0.5" max="24">
+      </div>
+      <div>
+        <label for="edDescanso">Descanso (minutos)</label>
+        <input id="edDescanso" type="number" step="5" min="0" max="480">
+      </div>
+    </div>
+
+    <label class="check">
+      <input id="edIncluye" type="checkbox">
+      <span>La jornada ya incluye el descanso</span>
+    </label>
+    <p class="ayuda" id="ayudaEditar"></p>
+
+    <div class="modal-acciones">
+      <button id="btnCancelarEditar" class="btn-secundario">Cancelar</button>
+      <button id="btnGuardarEditar" class="btn-primario">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="comun.js"></script>
+<script src="empleado.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
