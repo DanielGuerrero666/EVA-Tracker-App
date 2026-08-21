@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -203,12 +204,52 @@ def estado(datos: dict = Depends(sesion)):
 
     actual = estado_de(ultima["tipo"] if ultima else None)
 
+    # Tiempo trabajado/en descanso HOY, incluyendo la sesión en curso (sin
+    # salida todavía). v_resumen_diario (usada en `historial`) solo cuenta
+    # sesiones ya cerradas, así que mientras la jornada sigue abierta el día
+    # de hoy no aparece ahí — este cálculo es lo que alimenta el cronómetro
+    # en vivo del panel del empleado.
+    segundos_trabajados_hoy = 0.0
+    segundos_descanso_hoy = 0.0
+    trabajando_desde = None
+    descanso_desde = None
+    for m in hoy:
+        tipo, ts = m["tipo"], m["marcado_en"]
+        if tipo == "entrada":
+            trabajando_desde = ts
+        elif tipo == "descanso_inicio":
+            if trabajando_desde is not None:
+                segundos_trabajados_hoy += (ts - trabajando_desde).total_seconds()
+                trabajando_desde = None
+            descanso_desde = ts
+        elif tipo == "descanso_fin":
+            if descanso_desde is not None:
+                segundos_descanso_hoy += (ts - descanso_desde).total_seconds()
+                descanso_desde = None
+            trabajando_desde = ts
+        elif tipo == "salida":
+            if trabajando_desde is not None:
+                segundos_trabajados_hoy += (ts - trabajando_desde).total_seconds()
+                trabajando_desde = None
+            if descanso_desde is not None:
+                segundos_descanso_hoy += (ts - descanso_desde).total_seconds()
+                descanso_desde = None
+
+    if trabajando_desde is not None or descanso_desde is not None:
+        ahora_local = datetime.now(ZoneInfo(datos["timezone"])).replace(tzinfo=None)
+        if trabajando_desde is not None:
+            segundos_trabajados_hoy += max((ahora_local - trabajando_desde).total_seconds(), 0)
+        if descanso_desde is not None:
+            segundos_descanso_hoy += max((ahora_local - descanso_desde).total_seconds(), 0)
+
     return {
         "estado": actual,
         "acciones_validas": list(TRANSICIONES[actual].keys()),
         "desde": ultima["marcado_en"] if ultima else None,
         "marcaciones_hoy": [dict(m) for m in hoy],
         "historial": [dict(h) for h in historial],
+        "segundos_trabajados_hoy": round(segundos_trabajados_hoy),
+        "segundos_descanso_hoy": round(segundos_descanso_hoy),
         "config": {
             "jornada_horas": float(datos["jornada_horas"]),
             "descanso_minutos": datos["descanso_minutos"],

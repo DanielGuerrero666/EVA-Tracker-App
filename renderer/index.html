@@ -59,6 +59,11 @@
     <button id="btnMenu" class="btn-icono" title="Opciones">⋯</button>
   </header>
 
+  <div class="cronometro-caja">
+    <div class="cronometro-etiqueta">Tiempo trabajado hoy</div>
+    <div class="cronometro" id="cronometroTrabajado">00:00:00</div>
+  </div>
+
   <div class="reloj" id="reloj">--:--:--</div>
 
   <div class="estado" id="estadoCaja">
@@ -245,6 +250,19 @@
     <div class="modal-acciones">
       <button id="btnCancelarEditar" class="btn-secundario">Cancelar</button>
       <button id="btnGuardarEditar" class="btn-primario">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CONFIRMAR SALIDA ================= -->
+<div id="modalConfirmarSalida" class="modal oculta">
+  <div class="modal-caja">
+    <h2>¿Confirmar salida?</h2>
+    <p class="ayuda" id="resumenSalida"></p>
+
+    <div class="modal-acciones">
+      <button id="btnCancelarSalida" class="btn-secundario">Cancelar</button>
+      <button id="btnConfirmarSalida" class="btn-peligro">Sí, marcar salida</button>
     </div>
   </div>
 </div>

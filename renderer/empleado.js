@@ -45,6 +45,28 @@ const ETIQUETAS = {
   en_descanso: { texto: 'En descanso', color: 'var(--naranja)' },
 };
 
+// ==================================================================
+// Cronómetro de tiempo trabajado hoy — corre en vivo en el cliente,
+// anclado al segundero que manda el servidor en cada `cargarEstado()`.
+// ==================================================================
+let segundosTrabajadosBase = 0;
+let momentoBase = Date.now();
+let estadoTrabajo = 'fuera';
+
+function pintarCronometro() {
+  const el = $('cronometroTrabajado');
+  if (!el) return;
+  const enVivo = estadoTrabajo === 'trabajando' ? (Date.now() - momentoBase) / 1000 : 0;
+  const total = Math.max(Math.round(segundosTrabajadosBase + enVivo), 0);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  el.textContent = [h, m, s].map((n) => String(n).padStart(2, '0')).join(':');
+  el.classList.toggle('en-descanso', estadoTrabajo === 'en_descanso');
+  el.classList.toggle('fuera', estadoTrabajo === 'fuera');
+}
+setInterval(pintarCronometro, 1000);
+
 async function cargarEstado() {
   try {
     const datos = await window.asistencia.obtenerEstado();
@@ -56,6 +78,11 @@ async function cargarEstado() {
     $('estadoDetalle').textContent = datos.desde
       ? `Desde las ${fmtHora(datos.desde)}`
       : '';
+
+    estadoTrabajo = datos.estado;
+    segundosTrabajadosBase = Number(datos.segundos_trabajados_hoy) || 0;
+    momentoBase = Date.now();
+    pintarCronometro();
 
     aplicarAcciones(datos.estado, datos.acciones_validas);
     pintarMarcacionesHoy(datos.marcaciones_hoy);
@@ -105,11 +132,10 @@ function pintarMarcacionesHoy(marcaciones) {
 
 /** Barras de progreso del día en curso. */
 function pintarProgreso(datos) {
-  const hoy = datos.historial[0];
-  const esHoy = hoy && new Date(`${hoy.fecha}T12:00:00`).toDateString() === new Date().toDateString();
-
-  const trabajadas = esHoy ? Number(hoy.horas_trabajadas) : 0;
-  const descansoMin = esHoy ? Math.round(Number(hoy.horas_descanso) * 60) : 0;
+  // Usa el cálculo en vivo del servidor (incluye la jornada de hoy aunque
+  // siga abierta), no `historial`, que solo trae sesiones ya cerradas.
+  const trabajadas = Number(datos.segundos_trabajados_hoy || 0) / 3600;
+  const descansoMin = Math.round(Number(datos.segundos_descanso_hoy || 0) / 60);
 
   const esperado = trabajoEsperado(configUsuario);
   const permitido = configUsuario.descanso_minutos;
@@ -154,25 +180,48 @@ function pintarHistorial(filas) {
     </table>`;
 }
 
-// Los tres botones comparten manejador
+/** Marca la entrada/descanso/salida y refresca la pantalla. */
+async function ejecutarMarcacion(tipo) {
+  document.querySelectorAll('.btn-marcar').forEach((b) => { b.disabled = true; });
+  try {
+    const datos = await window.asistencia.marcar(tipo);
+    const nombres = {
+      entrada: 'Entrada registrada',
+      descanso_inicio: 'Descanso iniciado',
+      descanso_fin: 'Descanso terminado',
+      salida: 'Salida registrada',
+    };
+    mostrarMsg('msgMarcar', `${nombres[tipo]} a las ${fmtHora(datos.marcado_en)}.`, 'ok');
+  } catch (err) {
+    mostrarMsg('msgMarcar', err.message);
+  }
+  await cargarEstado();
+}
+
+// Los tres botones comparten manejador — salida pide confirmación antes
+// de marcar, porque es una acción que cierra la jornada del día.
 document.querySelectorAll('.btn-marcar').forEach((btn) => {
-  btn.addEventListener('click', async () => {
+  btn.addEventListener('click', () => {
     const tipo = btn.dataset.tipo;
-    document.querySelectorAll('.btn-marcar').forEach((b) => { b.disabled = true; });
-    try {
-      const datos = await window.asistencia.marcar(tipo);
-      const nombres = {
-        entrada: 'Entrada registrada',
-        descanso_inicio: 'Descanso iniciado',
-        descanso_fin: 'Descanso terminado',
-        salida: 'Salida registrada',
-      };
-      mostrarMsg('msgMarcar', `${nombres[tipo]} a las ${fmtHora(datos.marcado_en)}.`, 'ok');
-    } catch (err) {
-      mostrarMsg('msgMarcar', err.message);
+    if (tipo === 'salida') {
+      pintarCronometro();
+      $('resumenSalida').textContent =
+        `Llevas ${$('cronometroTrabajado').textContent} trabajadas hoy. ` +
+        'Esta acción cierra tu jornada.';
+      $('modalConfirmarSalida').classList.remove('oculta');
+    } else {
+      ejecutarMarcacion(tipo);
     }
-    await cargarEstado();
   });
+});
+
+$('btnCancelarSalida').addEventListener('click', () => {
+  $('modalConfirmarSalida').classList.add('oculta');
+});
+
+$('btnConfirmarSalida').addEventListener('click', () => {
+  $('modalConfirmarSalida').classList.add('oculta');
+  ejecutarMarcacion('salida');
 });
 
 // Cerrar sesión del empleado en este equipo (⋯ en la pantalla principal).

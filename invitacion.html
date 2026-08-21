@@ -55,16 +55,16 @@
 
   <div id="valida" class="oculto">
     <h1>Bienvenido, <span id="nombre"></span></h1>
-    <p class="sub">Tu cuenta está lista en <b id="correo"></b>.<br>¿Ya tienes la aplicación instalada en este equipo?</p>
+    <p class="sub">Tu cuenta está lista en <b id="correo"></b>.</p>
 
-    <button id="btnAbrir" class="btn btn-p">Sí, ábrela</button>
-    <a class="btn btn-s" href="/descargas/instalador.exe">No, descárgala primero</a>
+    <div id="msgAbrir" class="estado info">Verificando si ya tienes la aplicación instalada…</div>
 
-    <div id="msgAbrir" class="oculto"></div>
+    <button id="btnAbrir" class="btn btn-p oculto">Abrir la aplicación</button>
+    <a id="btnDescargar" class="btn btn-s oculto" href="/descargas/instalador.exe">Descargar la aplicación</a>
 
     <div class="paso">
-      <b>¿No se abrió al hacer click en "Sí, ábrela"?</b>
-      Instala la aplicación, ábrela y pega este código en la pantalla de activación:
+      <b>¿La aplicación no se abrió sola?</b>
+      Instálala, ábrela y pega este código en la pantalla de activación:
       <div class="codigo" id="codigo"></div>
       Servidor: <span class="codigo" style="display:inline-block;padding:4px 8px"
                       id="servidor"></span>
@@ -105,17 +105,40 @@
       var destino = 'asistencia://activar?servidor=' +
                     encodeURIComponent(servidor) +
                     '&token=' + encodeURIComponent(token);
+      var msg = document.getElementById('msgAbrir');
+      var btnAbrir = document.getElementById('btnAbrir');
+      var btnDescargar = document.getElementById('btnDescargar');
 
-      // No intentamos abrir el protocolo automáticamente: si la app no
-      // está instalada, el navegador muestra un error confuso ("no se
-      // puede abrir este enlace"). Solo lo intentamos cuando la persona
-      // confirma explícitamente que ya la tiene instalada.
-      document.getElementById('btnAbrir').addEventListener('click', function () {
+      // Si el sistema operativo logra abrir la app, la pestaña pierde el
+      // foco (el navegador queda de fondo). Lo usamos para inferir si la
+      // app está instalada sin preguntarle nada a la persona.
+      var seAbrio = false;
+      var marcarAbierta = function () { seAbrio = true; };
+      window.addEventListener('blur', marcarAbierta);
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) marcarAbierta();
+      });
+
+      // Intento automático de abrir la app.
+      window.location.href = destino;
+
+      setTimeout(function () {
+        if (seAbrio) {
+          msg.className = 'estado ok';
+          msg.textContent = 'Abriendo Control de Asistencia…';
+          btnAbrir.classList.remove('oculto');
+        } else {
+          // No respondió a tiempo: asumimos que no está instalada y
+          // arrancamos la descarga sin esperar a que la persona elija.
+          msg.className = 'estado info';
+          msg.textContent = 'No detectamos la aplicación instalada. Descargando el instalador…';
+          btnDescargar.classList.remove('oculto');
+          window.location.href = '/descargas/instalador.exe';
+        }
+      }, 2200);
+
+      btnAbrir.addEventListener('click', function () {
         window.location.href = destino;
-        document.getElementById('msgAbrir').classList.remove('oculto');
-        document.getElementById('msgAbrir').className = 'estado info';
-        document.getElementById('msgAbrir').textContent =
-          '¿No pasó nada? Pega el código de abajo en la aplicación manualmente.';
       });
     })
     .catch(function (err) {

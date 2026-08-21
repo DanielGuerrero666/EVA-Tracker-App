@@ -42,10 +42,23 @@ body {
 .fecha { font-size: 12px; color: var(--grey); text-transform: capitalize; margin-top: 1px; }
 .titulo-seccion { font-size: 17px; font-weight: 700; color: var(--dorado); }
 
-/* ---------- Reloj ---------- */
+/* ---------- Cronómetro de tiempo trabajado (elemento principal) ---------- */
+.cronometro-caja { text-align: center; margin-bottom: 6px; }
+.cronometro-etiqueta {
+  font-size: 12px; font-weight: 500; color: var(--grey);
+  text-transform: uppercase; letter-spacing: .4px; margin-bottom: 2px;
+}
+.cronometro {
+  font-size: 48px; font-weight: 700; color: var(--verde);
+  letter-spacing: .5px; font-variant-numeric: tabular-nums;
+}
+.cronometro.en-descanso { color: var(--naranja); }
+.cronometro.fuera { color: var(--grey-claro); }
+
+/* ---------- Reloj (hora actual, secundario) ---------- */
 .reloj {
-  font-size: 40px; font-weight: 700; color: var(--dorado);
-  text-align: center; letter-spacing: 1px;
+  font-size: 18px; font-weight: 500; color: var(--grey);
+  text-align: center; letter-spacing: .5px;
   font-variant-numeric: tabular-nums; margin-bottom: 14px;
 }
 
@@ -78,18 +91,19 @@ body {
 .btn-marcar.salida   { background: var(--rojo); }
 
 /* ---------- Botones comunes ---------- */
-.btn-primario, .btn-secundario {
+.btn-primario, .btn-secundario, .btn-peligro {
   width: 100%; padding: 13px; border: none; border-radius: 10px;
   font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer;
   transition: opacity .15s;
 }
 .btn-primario { background: var(--dorado); color: #fff; }
+.btn-peligro { background: var(--rojo); color: #fff; }
 .btn-secundario {
   background: transparent; color: var(--grey);
   border: 1px solid var(--linea);
 }
-.btn-primario:hover, .btn-secundario:hover { opacity: .85; }
-.btn-primario:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primario:hover, .btn-secundario:hover, .btn-peligro:hover { opacity: .85; }
+.btn-primario:disabled, .btn-peligro:disabled { opacity: .5; cursor: not-allowed; }
 
 .btn-icono {
   width: 32px; height: 32px; border: 1px solid var(--linea); border-radius: 8px;
