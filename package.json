@@ -1,0 +1,44 @@
+{
+  "name": "eva-tracker",
+  "productName": "EVA Tracker",
+  "version": "0.1.0",
+  "description": "EVA Tracker - time tracking app for Elite VA Consulting (clock in/out, breaks, shift history)",
+  "main": "main.js",
+  "author": "Elite VA Consulting",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.elitevaconsulting.evatracker",
+    "productName": "EVA Tracker",
+    "files": [
+      "main.js",
+      "preload.js",
+      "lib/**/*",
+      "src/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    }
+  }
+}
