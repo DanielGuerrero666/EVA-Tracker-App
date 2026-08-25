@@ -5,16 +5,16 @@ form.addEventListener('submit', async (event) => {
   event.preventDefault();
   errorEl.textContent = '';
 
-  const name = document.getElementById('name').value.trim();
   const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
 
-  if (!name || !email) {
-    errorEl.textContent = 'Name and email are required.';
+  if (!email || !password) {
+    errorEl.textContent = 'Email and password are required.';
     return;
   }
 
   try {
-    await window.eva.login(name, email);
+    await window.eva.login(email, password);
   } catch (err) {
     errorEl.textContent = err.message || 'Could not log in.';
   }

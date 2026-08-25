@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('eva', {
-  login: (name, email) => ipcRenderer.invoke('auth:login', { name, email }),
+  login: (email, password) => ipcRenderer.invoke('auth:login', { email, password }),
   logout: () => ipcRenderer.invoke('auth:logout'),
   getUser: () => ipcRenderer.invoke('auth:getUser'),
   clockIn: () => ipcRenderer.invoke('time:clockIn'),
@@ -11,4 +11,13 @@ contextBridge.exposeInMainWorld('eva', {
   startBreak: () => ipcRenderer.invoke('break:start'),
   endBreak: () => ipcRenderer.invoke('break:end'),
   getBreakStatus: () => ipcRenderer.invoke('break:getStatus'),
+  changePassword: (currentPassword, newPassword) =>
+    ipcRenderer.invoke('auth:changePassword', { currentPassword, newPassword }),
+  admin: {
+    listEmployees: () => ipcRenderer.invoke('admin:listEmployees'),
+    today: () => ipcRenderer.invoke('admin:today'),
+    exportCsv: () => ipcRenderer.invoke('admin:exportCsv'),
+    createEmployee: (employee) => ipcRenderer.invoke('admin:createEmployee', employee),
+    updateEmployee: (id, updates) => ipcRenderer.invoke('admin:updateEmployee', id, updates),
+  },
 });

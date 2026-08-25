@@ -10,6 +10,31 @@ const errorEl = document.getElementById('error');
 const historyList = document.getElementById('history-list');
 const logoutBtn = document.getElementById('logout-btn');
 
+const adminToggleBtn = document.getElementById('admin-toggle-btn');
+const trackerView = document.getElementById('tracker-view');
+const adminView = document.getElementById('admin-view');
+const adminErrorEl = document.getElementById('admin-error');
+const adminTableBody = document.getElementById('admin-table-body');
+const adminExportBtn = document.getElementById('admin-export-btn');
+const addEmployeeForm = document.getElementById('add-employee-form');
+const addEmployeeErrorEl = document.getElementById('add-employee-error');
+const addEmployeeSuccessEl = document.getElementById('add-employee-success');
+
+const editEmployeeTitleEl = document.getElementById('edit-employee-title');
+const editEmployeeForm = document.getElementById('edit-employee-form');
+const editEmployeeErrorEl = document.getElementById('edit-employee-error');
+const editEmployeeCancelBtn = document.getElementById('edit-employee-cancel-btn');
+
+let adminEmployeesById = new Map();
+
+const changePasswordToggleBtn = document.getElementById('change-password-toggle-btn');
+const changePasswordView = document.getElementById('change-password-view');
+const changePasswordTitleEl = document.getElementById('change-password-title');
+const changePasswordForm = document.getElementById('change-password-form');
+const changePasswordErrorEl = document.getElementById('change-password-error');
+
+let forcingPasswordChange = false;
+
 let currentStatus = { clockedIn: false, since: null };
 let currentBreak = { onBreak: false, since: null, usedMs: 0 };
 let tickInterval = null;
@@ -135,6 +160,89 @@ function renderShifts(shifts) {
   }
 }
 
+function renderAdminTable(overview) {
+  adminTableBody.innerHTML = '';
+
+  for (const employee of overview) {
+    const row = document.createElement('tr');
+
+    const name = document.createElement('td');
+    name.textContent = employee.name;
+
+    const status = document.createElement('td');
+    status.textContent = employee.clockedIn ? 'Clocked in' : 'Clocked out';
+    if (employee.clockedIn) status.classList.add('status-in');
+
+    const late = document.createElement('td');
+    late.textContent = employee.late ? 'Yes' : '–';
+    if (employee.late) late.classList.add('flag-yes');
+
+    const leftLate = document.createElement('td');
+    leftLate.textContent = employee.leftLate ? 'Yes' : '–';
+    if (employee.leftLate) leftLate.classList.add('flag-yes');
+
+    const editCell = document.createElement('td');
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'link admin-edit-btn';
+    editBtn.textContent = 'Edit';
+    editBtn.addEventListener('click', () => openEditEmployee(employee.id));
+    editCell.appendChild(editBtn);
+
+    row.appendChild(name);
+    row.appendChild(status);
+    row.appendChild(late);
+    row.appendChild(leftLate);
+    row.appendChild(editCell);
+    adminTableBody.appendChild(row);
+  }
+}
+
+function openEditEmployee(id) {
+  const employee = adminEmployeesById.get(id);
+  if (!employee) return;
+
+  editEmployeeErrorEl.textContent = '';
+  document.getElementById('edit-employee-id').value = employee.id;
+  document.getElementById('edit-employee-name').value = employee.name;
+  document.getElementById('edit-employee-clock-in').value = (employee.scheduled_clock_in || '').slice(0, 5);
+  document.getElementById('edit-employee-clock-out').value = (employee.scheduled_clock_out || '').slice(0, 5);
+  document.getElementById('edit-employee-break').value = employee.break_allowance_minutes ?? 60;
+
+  editEmployeeTitleEl.hidden = false;
+  editEmployeeForm.hidden = false;
+}
+
+function closeEditEmployee() {
+  editEmployeeTitleEl.hidden = true;
+  editEmployeeForm.hidden = true;
+  editEmployeeForm.reset();
+}
+
+async function loadAdminPanel() {
+  adminErrorEl.textContent = '';
+  closeEditEmployee();
+  try {
+    const [overview, employees] = await Promise.all([
+      window.eva.admin.today(),
+      window.eva.admin.listEmployees(),
+    ]);
+    adminEmployeesById = new Map(employees.map((e) => [e.id, e]));
+    renderAdminTable(overview);
+  } catch (err) {
+    adminErrorEl.textContent = err.message || 'Could not load admin data.';
+  }
+}
+
+function showView(view) {
+  trackerView.hidden = view !== 'tracker';
+  adminView.hidden = view !== 'admin';
+  changePasswordView.hidden = view !== 'password';
+  adminToggleBtn.textContent = view === 'admin' ? 'Back to tracker' : 'Admin panel';
+  changePasswordToggleBtn.textContent = view === 'password' ? 'Back to tracker' : 'Change password';
+  if (view === 'admin') loadAdminPanel();
+}
+
 async function refresh() {
   currentStatus = await window.eva.getStatus();
   currentBreak = await window.eva.getBreakStatus();
@@ -144,12 +252,27 @@ async function refresh() {
   renderShifts(await window.eva.getShifts(20));
 }
 
+async function finishLogin(user) {
+  if (user.role === 'admin') adminToggleBtn.hidden = false;
+  changePasswordToggleBtn.hidden = false;
+  showView('tracker');
+  await refresh();
+  startTick();
+}
+
 async function init() {
   const user = await window.eva.getUser();
   document.getElementById('user-name').textContent = user.name;
   document.getElementById('user-email').textContent = user.email;
-  await refresh();
-  startTick();
+
+  if (user.mustChangePassword) {
+    forcingPasswordChange = true;
+    changePasswordTitleEl.textContent = 'You must set a new password before continuing';
+    showView('password');
+    return;
+  }
+
+  await finishLogin(user);
 }
 
 toggleBtn.addEventListener('click', async () => {
@@ -188,6 +311,105 @@ breakBtn.addEventListener('click', async () => {
 
 logoutBtn.addEventListener('click', () => {
   window.eva.logout();
+});
+
+adminToggleBtn.addEventListener('click', () => {
+  showView(adminView.hidden ? 'admin' : 'tracker');
+});
+
+changePasswordToggleBtn.addEventListener('click', () => {
+  showView(changePasswordView.hidden ? 'password' : 'tracker');
+});
+
+adminExportBtn.addEventListener('click', async () => {
+  adminErrorEl.textContent = '';
+  adminExportBtn.disabled = true;
+  try {
+    const result = await window.eva.admin.exportCsv();
+    if (result.saved) adminErrorEl.textContent = `Saved to ${result.path}`;
+  } catch (err) {
+    adminErrorEl.textContent = err.message || 'Could not export CSV.';
+  } finally {
+    adminExportBtn.disabled = false;
+  }
+});
+
+addEmployeeForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  addEmployeeErrorEl.textContent = '';
+  addEmployeeSuccessEl.textContent = '';
+
+  const name = document.getElementById('employee-name').value.trim();
+  const email = document.getElementById('employee-email').value.trim();
+  const scheduledClockIn = document.getElementById('employee-clock-in').value || undefined;
+  const scheduledClockOut = document.getElementById('employee-clock-out').value || undefined;
+  const breakMinutes = document.getElementById('employee-break').value;
+  const breakAllowanceMinutes = breakMinutes ? Number(breakMinutes) : undefined;
+
+  try {
+    const { temporaryPassword } = await window.eva.admin.createEmployee({
+      name,
+      email,
+      scheduledClockIn,
+      scheduledClockOut,
+      breakAllowanceMinutes,
+    });
+    addEmployeeSuccessEl.textContent =
+      `Created. Temporary password: ${temporaryPassword} — share it with ${name}, it won't be shown again.`;
+    addEmployeeForm.reset();
+    await loadAdminPanel();
+  } catch (err) {
+    addEmployeeErrorEl.textContent = err.message || 'Could not create employee.';
+  }
+});
+
+editEmployeeForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  editEmployeeErrorEl.textContent = '';
+
+  const id = Number(document.getElementById('edit-employee-id').value);
+  const name = document.getElementById('edit-employee-name').value.trim();
+  const scheduledClockIn = document.getElementById('edit-employee-clock-in').value || undefined;
+  const scheduledClockOut = document.getElementById('edit-employee-clock-out').value || undefined;
+  const breakMinutes = document.getElementById('edit-employee-break').value;
+  const breakAllowanceMinutes = breakMinutes ? Number(breakMinutes) : undefined;
+
+  try {
+    await window.eva.admin.updateEmployee(id, {
+      name,
+      scheduledClockIn,
+      scheduledClockOut,
+      breakAllowanceMinutes,
+    });
+    closeEditEmployee();
+    await loadAdminPanel();
+  } catch (err) {
+    editEmployeeErrorEl.textContent = err.message || 'Could not update employee.';
+  }
+});
+
+editEmployeeCancelBtn.addEventListener('click', closeEditEmployee);
+
+changePasswordForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  changePasswordErrorEl.textContent = '';
+
+  const currentPassword = document.getElementById('current-password').value;
+  const newPassword = document.getElementById('new-password').value;
+
+  try {
+    await window.eva.changePassword(currentPassword, newPassword);
+    changePasswordForm.reset();
+    const wasForced = forcingPasswordChange;
+    forcingPasswordChange = false;
+    if (wasForced) {
+      await finishLogin(await window.eva.getUser());
+    } else {
+      showView('tracker');
+    }
+  } catch (err) {
+    changePasswordErrorEl.textContent = err.message || 'Could not update password.';
+  }
 });
 
 init();
