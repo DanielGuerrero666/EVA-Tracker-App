@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "WebFetch(domain:web.archive.org)"
+      "WebFetch(domain:web.archive.org)",
+      "Bash(command -v sshpass)",
+      "Bash(command -v ssh)",
+      "Bash(command -v plink)",
+      "Bash(command -v python3)",
+      "Bash(command -v python)",
+      "Bash(python3 \"C:\\\\Users\\\\User\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-User-Desktop-proyetos-EVA-tracker\\\\34310295-f79d-4b35-a0d4-c74291a699e2\\\\scratchpad\\\\ssh_probe.py\")"
     ]
   }
 }
