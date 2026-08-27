@@ -10,25 +10,48 @@ let store;
 let isQuitting = false;
 let updateReady = false;
 
+// The admin panel's table/forms need more room than the compact tracker
+// view — the (non-resizable) window is widened on demand instead of being
+// sized for the widest view all the time.
+const WINDOW_WIDTH = 420;
+const WINDOW_WIDTH_ADMIN = 760;
+
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
+// The three places the user asks to see the app again: clicking the tray
+// icon, picking "Open EVA Tracker" from its menu, or re-launching while an
+// instance is already running. Since the window is normally just hidden
+// (not closed) rather than reopened, none of these naturally restart the
+// process — which is required to actually swap in a downloaded update. So
+// this is also the one safe, non-disruptive moment to apply a pending
+// update: the user is asking to use the app right now anyway, and the
+// persisted session means the silent restart won't even require logging
+// in again.
+function showOrApplyUpdate() {
+  if (updateReady) {
+    autoUpdater.quitAndInstall(true, true);
+    return;
+  }
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    if (!mainWindow.isVisible()) mainWindow.show();
-    mainWindow.focus();
+    showOrApplyUpdate();
   });
 }
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 420,
+    width: WINDOW_WIDTH,
     height: 680,
     resizable: false,
     autoHideMenuBar: true,
@@ -64,10 +87,7 @@ async function updateTrayTooltip() {
 
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
-    { label: 'Open EVA Tracker', click: () => mainWindow.show() },
-    ...(updateReady
-      ? [{ label: 'Restart to update', click: () => autoUpdater.quitAndInstall() }]
-      : []),
+    { label: 'Open EVA Tracker', click: showOrApplyUpdate },
     { type: 'separator' },
     {
       label: 'Quit',
@@ -84,7 +104,7 @@ function createTray() {
   tray = new Tray(icon);
   tray.setToolTip('EVA Tracker');
   tray.setContextMenu(buildTrayMenu());
-  tray.on('click', () => mainWindow.show());
+  tray.on('click', showOrApplyUpdate);
 
   updateTrayTooltip();
 }
@@ -99,15 +119,18 @@ if (gotSingleInstanceLock) {
     createWindow();
     createTray();
 
-    autoUpdater.checkForUpdatesAndNotify();
-    setInterval(() => autoUpdater.checkForUpdatesAndNotify(), 4 * 60 * 60 * 1000);
+    // checkForUpdates() (not checkForUpdatesAndNotify()) — still downloads
+    // silently in the background via autoDownload, just without the native
+    // OS "update downloaded" notification. Installing happens later, on
+    // demand, via showOrApplyUpdate().
+    autoUpdater.checkForUpdates();
+    setInterval(() => autoUpdater.checkForUpdates(), 4 * 60 * 60 * 1000);
   });
 }
 
 autoUpdater.on('update-downloaded', () => {
   updateReady = true;
   updateTrayTooltip();
-  if (tray) tray.setContextMenu(buildTrayMenu());
 });
 
 autoUpdater.on('error', (err) => {
@@ -159,13 +182,24 @@ ipcMain.handle('admin:today', () => store.today());
 ipcMain.handle('admin:createEmployee', (_event, employee) => store.createEmployee(employee));
 ipcMain.handle('admin:updateEmployee', (_event, id, updates) => store.updateEmployee(id, updates));
 
-ipcMain.handle('admin:exportCsv', async () => {
-  const csv = await store.exportCsv();
+ipcMain.handle('admin:exportCsv', async (_event, params) => {
+  const { csv, filename } = await store.exportCsv(params);
   const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
-    defaultPath: 'shifts.csv',
+    defaultPath: filename,
     filters: [{ name: 'CSV', extensions: ['csv'] }],
   });
   if (canceled || !filePath) return { saved: false };
   fs.writeFileSync(filePath, csv);
   return { saved: true, path: filePath };
+});
+
+ipcMain.on('ui:setAdminView', (_event, isAdmin) => {
+  if (!mainWindow) return;
+  const [, height] = mainWindow.getSize();
+  // On Windows, setSize() on a resizable:false window reliably grows it but
+  // often silently no-ops when shrinking back — toggling resizable around
+  // the call forces the OS to actually apply the new (smaller) size.
+  mainWindow.setResizable(true);
+  mainWindow.setSize(isAdmin ? WINDOW_WIDTH_ADMIN : WINDOW_WIDTH, height);
+  mainWindow.setResizable(false);
 });

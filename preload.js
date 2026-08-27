@@ -13,10 +13,11 @@ contextBridge.exposeInMainWorld('eva', {
   getBreakStatus: () => ipcRenderer.invoke('break:getStatus'),
   changePassword: (currentPassword, newPassword) =>
     ipcRenderer.invoke('auth:changePassword', { currentPassword, newPassword }),
+  setAdminView: (isAdmin) => ipcRenderer.send('ui:setAdminView', isAdmin),
   admin: {
     listEmployees: () => ipcRenderer.invoke('admin:listEmployees'),
     today: () => ipcRenderer.invoke('admin:today'),
-    exportCsv: () => ipcRenderer.invoke('admin:exportCsv'),
+    exportCsv: (params) => ipcRenderer.invoke('admin:exportCsv', params),
     createEmployee: (employee) => ipcRenderer.invoke('admin:createEmployee', employee),
     updateEmployee: (id, updates) => ipcRenderer.invoke('admin:updateEmployee', id, updates),
   },

@@ -20,4 +20,16 @@ const updateEmployeeSchema = z.object({
   breakAllowanceMinutes: z.number().int().positive().optional(),
 });
 
-module.exports = { createEmployeeSchema, updateEmployeeSchema };
+const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Expected YYYY-MM-DD');
+
+const exportShiftsQuerySchema = z
+  .object({
+    range: z.enum(['today', 'yesterday', '7d', '30d', 'custom']).optional().default('today'),
+    from: isoDate.optional(),
+    to: isoDate.optional(),
+  })
+  .refine((data) => data.range !== 'custom' || (data.from && data.to), {
+    message: 'Custom range requires both from and to (YYYY-MM-DD)',
+  });
+
+module.exports = { createEmployeeSchema, updateEmployeeSchema, exportShiftsQuerySchema };

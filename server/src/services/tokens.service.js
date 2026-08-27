@@ -20,6 +20,18 @@ function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
+// Rows past their expiry have no further use — rotateRefreshToken already
+// rejects a token once expires_at has passed, revoked or not — so it's safe
+// to purge them here on every issuance instead of needing a separate cron
+// job. Best-effort: a cleanup hiccup should never block login/refresh.
+async function cleanupExpiredTokens() {
+  try {
+    await pool.query('DELETE FROM refresh_tokens WHERE expires_at < now()');
+  } catch (err) {
+    console.error('Failed to clean up expired refresh tokens:', err);
+  }
+}
+
 async function issueRefreshToken(userId) {
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + REFRESH_TTL_MS);
@@ -27,6 +39,7 @@ async function issueRefreshToken(userId) {
     'INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
     [userId, hashToken(token), expiresAt]
   );
+  cleanupExpiredTokens();
   return token;
 }
 

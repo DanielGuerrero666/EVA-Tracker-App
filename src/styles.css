@@ -32,6 +32,11 @@ body {
   width: 100%;
   max-width: 360px;
   padding: 24px 32px;
+  transition: max-width 0.15s ease;
+}
+
+.card.card-wide {
+  max-width: 680px;
 }
 
 .brand {
@@ -66,7 +71,9 @@ input[type='text'],
 input[type='email'],
 input[type='password'],
 input[type='time'],
-input[type='number'] {
+input[type='date'],
+input[type='number'],
+select {
   width: 100%;
   padding: 10px 12px;
   margin-bottom: 16px;
@@ -74,6 +81,8 @@ input[type='number'] {
   border-radius: 8px;
   font-family: inherit;
   font-size: 14px;
+  background: var(--white);
+  color: var(--black);
 }
 
 input:focus {
@@ -273,6 +282,46 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 8px;
   margin-bottom: 16px;
+}
+
+.export-box {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.export-box label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.export-box select,
+.export-box input {
+  margin-bottom: 12px;
+}
+
+.export-box button {
+  margin-bottom: 0;
+}
+
+/* :not([hidden]) matters here — a bare `.export-custom-range { display: flex }`
+   would outrank the UA stylesheet's `[hidden] { display: none }` (author
+   styles beat UA styles at equal specificity) and show the fields even
+   while the [hidden] attribute is set. */
+.export-custom-range:not([hidden]) {
+  display: flex;
+  gap: 12px;
+}
+
+.export-custom-range > div {
+  flex: 1;
+}
+
+.export-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: -6px 0 12px;
 }
 
 .admin-edit-btn {

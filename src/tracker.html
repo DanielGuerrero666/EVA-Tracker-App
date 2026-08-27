@@ -70,7 +70,29 @@
           <tbody id="admin-table-body"></tbody>
         </table>
       </div>
-      <button id="admin-export-btn" class="btn-primary">Export CSV</button>
+      <div class="history-title">Export shifts</div>
+      <div class="export-box">
+        <label for="export-range-select">Date range</label>
+        <select id="export-range-select">
+          <option value="today" selected>Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last month</option>
+          <option value="custom">Custom range…</option>
+        </select>
+        <div id="export-custom-range" class="export-custom-range" hidden>
+          <div>
+            <label for="export-from">From</label>
+            <input type="date" id="export-from" />
+          </div>
+          <div>
+            <label for="export-to">To</label>
+            <input type="date" id="export-to" />
+          </div>
+        </div>
+        <div class="export-hint">CSV includes Colombia-time (UTC-5) timestamps and a summary of hours worked for the selected range.</div>
+        <button id="admin-export-btn" class="btn-primary">Export CSV</button>
+      </div>
 
       <div class="history-title" id="edit-employee-title" hidden>Edit employee</div>
       <form id="edit-employee-form" hidden>

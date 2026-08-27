@@ -10,12 +10,17 @@ const errorEl = document.getElementById('error');
 const historyList = document.getElementById('history-list');
 const logoutBtn = document.getElementById('logout-btn');
 
+const cardEl = document.querySelector('.card');
 const adminToggleBtn = document.getElementById('admin-toggle-btn');
 const trackerView = document.getElementById('tracker-view');
 const adminView = document.getElementById('admin-view');
 const adminErrorEl = document.getElementById('admin-error');
 const adminTableBody = document.getElementById('admin-table-body');
 const adminExportBtn = document.getElementById('admin-export-btn');
+const exportRangeSelect = document.getElementById('export-range-select');
+const exportCustomRangeEl = document.getElementById('export-custom-range');
+const exportFromInput = document.getElementById('export-from');
+const exportToInput = document.getElementById('export-to');
 const addEmployeeForm = document.getElementById('add-employee-form');
 const addEmployeeErrorEl = document.getElementById('add-employee-error');
 const addEmployeeSuccessEl = document.getElementById('add-employee-success');
@@ -240,6 +245,8 @@ function showView(view) {
   changePasswordView.hidden = view !== 'password';
   adminToggleBtn.textContent = view === 'admin' ? 'Back to tracker' : 'Admin panel';
   changePasswordToggleBtn.textContent = view === 'password' ? 'Back to tracker' : 'Change password';
+  cardEl.classList.toggle('card-wide', view === 'admin');
+  window.eva.setAdminView(view === 'admin');
   if (view === 'admin') loadAdminPanel();
 }
 
@@ -321,11 +328,27 @@ changePasswordToggleBtn.addEventListener('click', () => {
   showView(changePasswordView.hidden ? 'password' : 'tracker');
 });
 
+exportRangeSelect.addEventListener('change', () => {
+  exportCustomRangeEl.hidden = exportRangeSelect.value !== 'custom';
+});
+
 adminExportBtn.addEventListener('click', async () => {
   adminErrorEl.textContent = '';
+
+  const range = exportRangeSelect.value;
+  const params = { range };
+  if (range === 'custom') {
+    if (!exportFromInput.value || !exportToInput.value) {
+      adminErrorEl.textContent = 'Pick both a "From" and "To" date for a custom range.';
+      return;
+    }
+    params.from = exportFromInput.value;
+    params.to = exportToInput.value;
+  }
+
   adminExportBtn.disabled = true;
   try {
-    const result = await window.eva.admin.exportCsv();
+    const result = await window.eva.admin.exportCsv(params);
     if (result.saved) adminErrorEl.textContent = `Saved to ${result.path}`;
   } catch (err) {
     adminErrorEl.textContent = err.message || 'Could not export CSV.';
