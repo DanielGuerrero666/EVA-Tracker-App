@@ -17,6 +17,7 @@ const adminView = document.getElementById('admin-view');
 const adminErrorEl = document.getElementById('admin-error');
 const adminTableBody = document.getElementById('admin-table-body');
 const adminExportBtn = document.getElementById('admin-export-btn');
+const adminFullscreenBtn = document.getElementById('admin-fullscreen-btn');
 const exportRangeSelect = document.getElementById('export-range-select');
 const exportCustomRangeEl = document.getElementById('export-custom-range');
 const exportFromInput = document.getElementById('export-from');
@@ -31,6 +32,10 @@ const editEmployeeErrorEl = document.getElementById('edit-employee-error');
 const editEmployeeCancelBtn = document.getElementById('edit-employee-cancel-btn');
 
 let adminEmployeesById = new Map();
+let isFullScreen = false;
+// showView() awaits the main process, so a second click landing mid-switch would
+// interleave the two halves of the resize dance below.
+let switchingView = false;
 
 const changePasswordToggleBtn = document.getElementById('change-password-toggle-btn');
 const changePasswordView = document.getElementById('change-password-view');
@@ -239,15 +244,44 @@ async function loadAdminPanel() {
   }
 }
 
-function showView(view) {
-  trackerView.hidden = view !== 'tracker';
-  adminView.hidden = view !== 'admin';
-  changePasswordView.hidden = view !== 'password';
-  adminToggleBtn.textContent = view === 'admin' ? 'Back to tracker' : 'Admin panel';
-  changePasswordToggleBtn.textContent = view === 'password' ? 'Back to tracker' : 'Change password';
-  cardEl.classList.toggle('card-wide', view === 'admin');
-  window.eva.setAdminView(view === 'admin');
-  if (view === 'admin') loadAdminPanel();
+function renderWindowMode({ fullScreen, maximized }) {
+  isFullScreen = fullScreen;
+  // Both states hand the card a lot more room than the 680px the panel is
+  // designed around, so it is allowed to spread out.
+  cardEl.classList.toggle('card-full', fullScreen || maximized);
+  adminFullscreenBtn.textContent = fullScreen ? 'Exit full screen' : 'Full screen';
+}
+
+async function showView(view) {
+  if (switchingView) return;
+  switchingView = true;
+
+  try {
+    const goingAdmin = view === 'admin';
+
+    // The card's width and the window's width are set from two different
+    // processes, so they are sequenced rather than fired off together: grow the
+    // window before widening the card, and narrow the card before shrinking the
+    // window. Either way round, the card is never briefly wider than the window
+    // it lives in — which used to clip its left edge off-screen.
+    if (goingAdmin) await window.eva.setAdminView(true);
+    else cardEl.classList.remove('card-wide', 'card-full');
+
+    trackerView.hidden = view !== 'tracker';
+    adminView.hidden = !goingAdmin;
+    changePasswordView.hidden = view !== 'password';
+    adminToggleBtn.textContent = goingAdmin ? 'Back to tracker' : 'Admin panel';
+    changePasswordToggleBtn.textContent = view === 'password' ? 'Back to tracker' : 'Change password';
+
+    if (goingAdmin) {
+      cardEl.classList.add('card-wide');
+      loadAdminPanel();
+    } else {
+      await window.eva.setAdminView(false);
+    }
+  } finally {
+    switchingView = false;
+  }
 }
 
 async function refresh() {
@@ -262,7 +296,7 @@ async function refresh() {
 async function finishLogin(user) {
   if (user.role === 'admin') adminToggleBtn.hidden = false;
   changePasswordToggleBtn.hidden = false;
-  showView('tracker');
+  await showView('tracker');
   await refresh();
   startTick();
 }
@@ -275,7 +309,7 @@ async function init() {
   if (user.mustChangePassword) {
     forcingPasswordChange = true;
     changePasswordTitleEl.textContent = 'You must set a new password before continuing';
-    showView('password');
+    await showView('password');
     return;
   }
 
@@ -322,6 +356,24 @@ logoutBtn.addEventListener('click', () => {
 
 adminToggleBtn.addEventListener('click', () => {
   showView(adminView.hidden ? 'admin' : 'tracker');
+});
+
+window.eva.onWindowMode(renderWindowMode);
+
+adminFullscreenBtn.addEventListener('click', () => {
+  window.eva.toggleAdminFullScreen();
+});
+
+// Full screen hides the frame, and with it the restore button, so the panel has
+// to offer its own way back out. Esc and F11 are what a user reaches for first.
+// Both are ignored outside the admin panel, which is the only view allowed to
+// leave its fixed size at all.
+document.addEventListener('keydown', (event) => {
+  if (adminView.hidden) return;
+  if (event.key === 'F11' || (event.key === 'Escape' && isFullScreen)) {
+    event.preventDefault();
+    window.eva.toggleAdminFullScreen();
+  }
 });
 
 changePasswordToggleBtn.addEventListener('click', () => {
@@ -428,7 +480,7 @@ changePasswordForm.addEventListener('submit', async (event) => {
     if (wasForced) {
       await finishLogin(await window.eva.getUser());
     } else {
-      showView('tracker');
+      await showView('tracker');
     }
   } catch (err) {
     changePasswordErrorEl.textContent = err.message || 'Could not update password.';

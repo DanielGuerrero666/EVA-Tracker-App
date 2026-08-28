@@ -25,18 +25,37 @@ body {
   color: var(--black);
   display: flex;
   align-items: flex-start;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .card {
   width: 100%;
   max-width: 360px;
+  /* margin-inline, rather than the body's justify-content, does the centring.
+     The card's width and the OS window's width are set by two different code
+     paths (a CSS class here, setSize() in the main process), so the card can
+     momentarily be wider than the window. Centred overflow would spill equally
+     both ways and `overflow: hidden` would clip the left half away for good,
+     dragging the labels and inputs off-screen; auto margins collapse to 0 when
+     there is no free space, so the card stays pinned to the left edge instead. */
+  margin-inline: auto;
   padding: 24px 32px;
-  transition: max-width 0.15s ease;
 }
 
+/* The admin panel is the only view allowed to change size, so it is also the
+   only one that has to cope with an arbitrary window height: the card becomes a
+   flex column pinned to the viewport and #admin-view absorbs whatever vertical
+   space is left, replacing the hard-coded 480px cap that assumed a 680px-tall
+   window. */
 .card.card-wide {
   max-width: 680px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.card.card-wide.card-full {
+  max-width: 1280px;
 }
 
 .brand {
@@ -276,6 +295,49 @@ button:disabled {
   padding-right: 4px;
 }
 
+.card-wide #admin-view:not([hidden]) {
+  flex: 1 1 auto;
+  /* min-height: 0 is what actually lets a flex item shrink below its content
+     height. Without it the panel would push the card past the viewport and the
+     overflow would land on the (overflow: hidden) body, so the panel would stop
+     scrolling itself and the bottom of the form would be unreachable. */
+  min-height: 0;
+  max-height: none;
+}
+
+/* Carries the "Today" heading's original margins so adding the full-screen
+   button beside it does not shift the table below. */
+.admin-view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 24px 0 10px;
+}
+
+.admin-view-head .history-title {
+  margin: 0;
+}
+
+/* At 680px — and far more in full screen — the panel is nearly twice the
+   tracker's width, but a name, email or time field gains nothing from being
+   600px long: it just strands each control a screen away from the label above
+   it and reads as though the form had spilled out past the rest of the panel.
+   Cap every control near the width it has in the compact view instead. */
+#admin-view {
+  --admin-field-width: 340px;
+}
+
+#add-employee-form input,
+#add-employee-form button,
+#edit-employee-form input,
+#edit-employee-form button,
+.export-box select,
+.export-box input,
+.export-box button {
+  max-width: var(--admin-field-width);
+}
+
 .admin-table-wrap {
   max-height: 180px;
   overflow-y: auto;
@@ -312,6 +374,7 @@ button:disabled {
 .export-custom-range:not([hidden]) {
   display: flex;
   gap: 12px;
+  max-width: var(--admin-field-width);
 }
 
 .export-custom-range > div {
@@ -352,6 +415,10 @@ button:disabled {
   text-transform: uppercase;
   font-size: 11px;
   letter-spacing: 0.04em;
+}
+
+.card-full .admin-table-wrap {
+  max-height: 45vh;
 }
 
 .status-in {

@@ -1,0 +1,192 @@
+# Continuous delivery for EVA Tracker.
+#
+# Push a tag like v1.0.1 and this pipeline builds the Windows installer,
+# publishes it to this project's Generic Package Registry, and cuts a GitLab
+# Release. Every installed copy of the app polls that registry (once at start-up,
+# then every four hours), downloads a newer version in the background, and
+# installs it silently the next time the user opens the app from the tray.
+#
+# Releasing is therefore just:
+#     git tag v1.0.1 && git push origin v1.0.1
+# Nothing else starts a pipeline — see the workflow: block below.
+#
+#
+# WHY A LINUX/DOCKER RUNNER, NOT THE WINDOWS SHELL RUNNER THIS REPLACES
+#
+# The previous pipeline installed Node with Chocolatey and then called
+# `refreshenv`, which failed with:
+#     RefreshEnv.cmd does not work when run from this process.
+# `refreshenv` is RefreshEnv.cmd, a *batch* script. GitLab's Windows shell
+# executor runs PowerShell, and a batch file cannot alter the environment of the
+# PowerShell process that invoked it — so it printed that message, returned
+# non-zero, and failed the job. (The PowerShell equivalent would have been
+# `Import-Module "$env:ChocolateyInstall\helpers\chocolateyProfile.psm1"` then
+# `Update-SessionEnvironment`.)
+#
+# Rather than patch that, the build moves to Docker, where Chocolatey is not
+# needed at all: electronuserland/builder ships Node plus a pre-initialised Wine
+# prefix, and electron-builder cross-compiles the NSIS installer from Linux.
+# Wine genuinely is required — electron-builder shells out to rcedit-ia32.exe to
+# stamp the icon and version resources into the .exe, and runs the installer stub
+# once under Wine to generate the uninstaller. A plain node:20 image fails on
+# both, so the image tag must keep its `-wine` suffix.
+#
+#
+# NOTES FOR WHOEVER EDITS package.json NEXT
+#
+#   * build.artifactName must stay free of spaces. GitLab's package registry
+#     rejects file names containing them, and electron-builder writes the raw
+#     file name into latest.yml for the generic provider (it only sanitises for
+#     GitHub). The default "${productName} Setup ${version}.${ext}" would try to
+#     upload "EVA Tracker Setup 1.0.1.exe" and be refused with HTTP 400.
+#
+#   * nsis.oneClick must stay true. It is the only configuration in which a
+#     silent update never raises UAC: the elevation branch that assisted
+#     installers compile in — triggered whenever an HKLM InstallLocation exists,
+#     e.g. because a user once chose "for all users" — is not present at all, and
+#     installs always go per-user into %LOCALAPPDATA%\Programs.
+#     allowToChangeInstallationDirectory cannot be combined with it
+#     (electron-builder rejects the build outright), and letting users install
+#     into Program Files is exactly what breaks unattended updates.
+#
+#   * Do not add win.publisherName or publish.publisherName while builds are
+#     unsigned. Either one is written into app-update.yml, after which every user
+#     fails with ERR_UPDATER_INVALID_SIGNATURE against the unsigned installer.
+#     win.verifyUpdateCodeSignature: false makes that explicit.
+#
+#   * build.publish.url is rewritten by this pipeline before the build, so the
+#     value frozen into each installer is always this project's real registry.
+#     The projects/0 placeholder in package.json is asserted to be gone below.
+
+workflow:
+  rules:
+    # Semver tags only. No branch, merge-request or scheduled pipelines: a
+    # release is a deliberate act, and anything else publishing to the update
+    # feed would push a build onto every user's machine.
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - when: never
+
+stages:
+  - build
+  - release
+
+variables:
+  # electron-builder's Linux defaults live under /root/.cache, which GitLab
+  # cannot cache — cache paths have to sit inside the project directory. HOME is
+  # deliberately left alone so the image's pre-built /root/.wine prefix is still
+  # found.
+  ELECTRON_CACHE: "$CI_PROJECT_DIR/.cache/electron"
+  ELECTRON_BUILDER_CACHE: "$CI_PROJECT_DIR/.cache/electron-builder"
+  npm_config_cache: "$CI_PROJECT_DIR/.cache/npm"
+  # The one fixed registry folder the app checks for updates. Installers are
+  # versioned by file name, so every release can live here alongside a
+  # latest.yml that is overwritten each time — which is what lets the single URL
+  # frozen into every shipped build always resolve to the newest version. Keeping
+  # the older .exe.blockmap files here is also what makes differential
+  # (delta) downloads possible on subsequent updates.
+  UPDATE_PACKAGE: eva-tracker
+  UPDATE_CHANNEL: latest
+
+build:windows:
+  stage: build
+  # Node 20, matching what the app was previously built with. The bare `:wine`
+  # tag currently resolves to Node 24, which electron-builder 25 predates.
+  # Pin by digest if you need the image to be truly immutable — even the dated
+  # tags get re-pushed.
+  image: electronuserland/builder:20-wine
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .cache/
+  script:
+    - set -euo pipefail
+
+    # The tag is the version. package.json's version is what app.getVersion()
+    # and the updater compare, so it is synced from the tag instead of being
+    # bumped by hand in a separate commit.
+    - VERSION="${CI_COMMIT_TAG#v}"
+    - npm ci
+    - npm version --no-git-tag-version --allow-same-version "$VERSION"
+
+    # Point the build at THIS project's registry. Deriving it from CI variables
+    # means the URL baked into app-update.yml is correct by construction — on
+    # gitlab.com or self-hosted — rather than a hand-edited project id that goes
+    # stale silently and only shows up as "updates never arrive".
+    - FEED="${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${UPDATE_PACKAGE}/${UPDATE_CHANNEL}"
+    - |
+      node -e '
+        const fs = require("fs");
+        const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+        pkg.build.publish.url = process.argv[1];
+        fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+      ' "$FEED"
+    - echo "Update feed: $FEED"
+
+    # --publish never, because electron-builder has no publisher for the generic
+    # provider: --publish always would silently upload nothing and still exit 0.
+    # It does still write dist/latest.yml, which is the manifest the updater
+    # reads, so the artifacts are complete — they just have to be uploaded by
+    # hand further down.
+    - npx electron-builder --win nsis --publish never
+
+    # Fail here rather than shipping a build that can never update itself. Each
+    # of these has a silent failure mode in the field.
+    - test -f dist/latest.yml
+    - test -f "dist/EVA-Tracker-Setup-${VERSION}.exe"
+    - grep -q "projects/${CI_PROJECT_ID}/" dist/win-unpacked/resources/app-update.yml
+    - |
+      if grep -q publisherName dist/win-unpacked/resources/app-update.yml; then
+        echo "app-update.yml contains publisherName, but the installer is unsigned."
+        echo "Every user would fail with ERR_UPDATER_INVALID_SIGNATURE. Aborting."
+        exit 1
+      fi
+
+    # Upload. latest.yml goes LAST so a client polling mid-upload never sees a
+    # manifest pointing at an installer that has not landed yet.
+    - |
+      for f in \
+        "dist/EVA-Tracker-Setup-${VERSION}.exe" \
+        "dist/EVA-Tracker-Setup-${VERSION}.exe.blockmap" \
+        dist/latest.yml
+      do
+        [ -f "$f" ] || { echo "missing $f, skipping"; continue; }
+        echo "uploading $(basename "$f")"
+        curl --fail-with-body --silent --show-error \
+             --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+             --upload-file "$f" \
+             "${FEED}/$(basename "$f")"
+      done
+
+    # Hand the version to the release job, which cannot strip the "v" itself.
+    - echo "PKG_VERSION=${VERSION}" >> build.env
+  artifacts:
+    paths:
+      - dist/EVA-Tracker-Setup-*.exe
+      - dist/latest.yml
+    expire_in: 1 month
+    reports:
+      dotenv: build.env
+
+release:gitlab:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - build:windows
+  script:
+    - echo "Tagging release $CI_COMMIT_TAG (version $PKG_VERSION)"
+  release:
+    tag_name: $CI_COMMIT_TAG
+    name: EVA Tracker $CI_COMMIT_TAG
+    description: |
+      Automated release built from $CI_COMMIT_TAG.
+
+      Existing installations update themselves: the app downloads this version in
+      the background and installs it silently the next time it is opened from the
+      tray. No action is needed from employees.
+    assets:
+      links:
+        - name: EVA-Tracker-Setup-$PKG_VERSION.exe (Windows installer)
+          url: $CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$UPDATE_PACKAGE/$UPDATE_CHANNEL/EVA-Tracker-Setup-$PKG_VERSION.exe
+          link_type: package

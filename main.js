@@ -11,10 +11,17 @@ let isQuitting = false;
 let updateReady = false;
 
 // The admin panel's table/forms need more room than the compact tracker
-// view — the (non-resizable) window is widened on demand instead of being
-// sized for the widest view all the time.
+// view — the window is widened on demand instead of being sized for the widest
+// view all the time.
 const WINDOW_WIDTH = 420;
+const WINDOW_HEIGHT = 680;
 const WINDOW_WIDTH_ADMIN = 760;
+const WINDOW_HEIGHT_MIN_ADMIN = 520;
+
+let adminViewActive = false;
+// The size the admin last had, so that resizing the panel and then dipping back
+// into the tracker doesn't silently throw the resize away.
+let adminSize = null;
 
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
@@ -49,11 +56,88 @@ if (!gotSingleInstanceLock) {
   });
 }
 
+// The admin panel is the only view the user may resize, maximise or put full
+// screen. Every other view — login, tracker, change-password — is one fixed
+// column of controls that gains nothing from being dragged about, so the window
+// is pinned shut again the moment the panel is closed. resizable alone is not
+// enough: the maximise button and the full-screen entry point are separate
+// capabilities and have to be withdrawn explicitly.
+function lockCompactSize() {
+  if (!mainWindow) return;
+
+  // Order matters: setFullScreen() is a no-op whenever fullScreenable is false,
+  // so the window has to be brought back out of full screen BEFORE that
+  // capability is withdrawn at the end of this function, or it is stranded full
+  // screen with no way out. Doing it here — rather than from a
+  // 'leave-full-screen' handler — is also what makes the resize below stick:
+  // on Windows that event is emitted *before* the transition runs, so
+  // isFullScreen() still reports the old value inside it and any setSize() from
+  // there is overwritten by the saved-rect restore. The whole native chain is
+  // synchronous, so by the time setFullScreen(false) returns the window is
+  // genuinely back to its pre-full-screen rect.
+  if (mainWindow.isFullScreen()) mainWindow.setFullScreen(false);
+  if (mainWindow.isMaximized()) mainWindow.unmaximize();
+
+  mainWindow.setResizable(true);
+  // Both constraints have to be relaxed before the window will move:
+  // setSize() is clamped *up* to the current minimum, and every setSize() on a
+  // non-resizable window pins minimum and maximum to the size it had at the
+  // time — so the compact window carries a 420x680 ceiling that would silently
+  // swallow the growth to 760. 0 means unbounded.
+  mainWindow.setMaximumSize(0, 0);
+  mainWindow.setMinimumSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+  mainWindow.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+  mainWindow.setResizable(false);
+  mainWindow.setMaximizable(false);
+  mainWindow.setFullScreenable(false);
+}
+
+function unlockAdminSize() {
+  if (!mainWindow) return;
+
+  // setResizable(true) first: while the window is non-resizable, every resize
+  // re-pins its minimum and maximum to the requested size, which is exactly
+  // what would block the growth below.
+  mainWindow.setResizable(true);
+  mainWindow.setMaximizable(true);
+  mainWindow.setFullScreenable(true);
+
+  const [, currentHeight] = mainWindow.getSize();
+  mainWindow.setMaximumSize(0, 0);
+  // Raise the floor so the roster table can never be squeezed narrower than it
+  // was designed for; growing past it in the same tick is fine.
+  mainWindow.setMinimumSize(WINDOW_WIDTH_ADMIN, WINDOW_HEIGHT_MIN_ADMIN);
+  const [width, height] = adminSize || [
+    WINDOW_WIDTH_ADMIN,
+    Math.max(currentHeight, WINDOW_HEIGHT_MIN_ADMIN),
+  ];
+  mainWindow.setSize(width, height);
+}
+
+// Full screen and maximise both hide the frame's usual affordances, so the
+// renderer is told about them: it swaps the panel's button label and lets the
+// card use the extra width.
+//
+// `overrides` is not a convenience. On Windows the full-screen events are
+// emitted before Electron flips the underlying flag, so isFullScreen() reports
+// the *previous* value inside those handlers — reading it back would send the
+// renderer exactly the opposite of what just happened.
+function sendWindowMode(overrides) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send('ui:windowMode', {
+    fullScreen: mainWindow.isFullScreen(),
+    maximized: mainWindow.isMaximized(),
+    ...overrides,
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
-    height: 680,
+    height: WINDOW_HEIGHT,
     resizable: false,
+    maximizable: false,
+    fullscreenable: false,
     autoHideMenuBar: true,
     backgroundColor: '#FFFFFF',
     icon: path.join(__dirname, 'build/icon.ico'),
@@ -75,6 +159,11 @@ function createWindow() {
       mainWindow.hide();
     }
   });
+
+  mainWindow.on('enter-full-screen', () => sendWindowMode({ fullScreen: true }));
+  mainWindow.on('leave-full-screen', () => sendWindowMode({ fullScreen: false }));
+  mainWindow.on('maximize', () => sendWindowMode({ maximized: true }));
+  mainWindow.on('unmaximize', () => sendWindowMode({ maximized: false }));
 }
 
 async function updateTrayTooltip() {
@@ -113,7 +202,10 @@ if (gotSingleInstanceLock) {
   app.whenReady().then(() => {
     store = new ApiClient({
       onSessionExpired: () => {
-        if (mainWindow) mainWindow.loadFile(path.join('src', 'login.html'));
+        if (!mainWindow) return;
+        adminViewActive = false;
+        lockCompactSize();
+        mainWindow.loadFile(path.join('src', 'login.html'));
       },
     });
     createWindow();
@@ -143,6 +235,8 @@ app.on('before-quit', () => {
 
 ipcMain.handle('auth:login', async (_event, { email, password }) => {
   const user = await store.login(email, password);
+  adminViewActive = false;
+  lockCompactSize();
   mainWindow.loadFile(path.join('src', 'tracker.html'));
   updateTrayTooltip();
   return user;
@@ -150,6 +244,10 @@ ipcMain.handle('auth:login', async (_event, { email, password }) => {
 
 ipcMain.handle('auth:logout', async () => {
   await store.logout();
+  // Logging out from the admin panel must not leave the login screen sitting in
+  // a wide, resizable — possibly full-screen — window.
+  adminViewActive = false;
+  lockCompactSize();
   mainWindow.loadFile(path.join('src', 'login.html'));
   updateTrayTooltip();
 });
@@ -193,13 +291,26 @@ ipcMain.handle('admin:exportCsv', async (_event, params) => {
   return { saved: true, path: filePath };
 });
 
-ipcMain.on('ui:setAdminView', (_event, isAdmin) => {
+// handle(), not on(), so the renderer can await the frame actually being wide
+// before it applies the CSS class that widens the card inside it — otherwise the
+// card is briefly wider than the window and its left edge is clipped away.
+ipcMain.handle('ui:setAdminView', (_event, isAdmin) => {
   if (!mainWindow) return;
-  const [, height] = mainWindow.getSize();
-  // On Windows, setSize() on a resizable:false window reliably grows it but
-  // often silently no-ops when shrinking back — toggling resizable around
-  // the call forces the OS to actually apply the new (smaller) size.
-  mainWindow.setResizable(true);
-  mainWindow.setSize(isAdmin ? WINDOW_WIDTH_ADMIN : WINDOW_WIDTH, height);
-  mainWindow.setResizable(false);
+
+  if (adminViewActive && !isAdmin && !mainWindow.isFullScreen() && !mainWindow.isMaximized()) {
+    adminSize = mainWindow.getSize();
+  }
+
+  adminViewActive = Boolean(isAdmin);
+  if (adminViewActive) unlockAdminSize();
+  else lockCompactSize();
+});
+
+ipcMain.handle('ui:toggleAdminFullScreen', () => {
+  // Guarded on adminViewActive so a stale message from any other view cannot
+  // unlock the window.
+  if (!mainWindow || !adminViewActive) return false;
+  const next = !mainWindow.isFullScreen();
+  mainWindow.setFullScreen(next);
+  return next;
 });

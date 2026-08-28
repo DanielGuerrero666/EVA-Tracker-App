@@ -13,7 +13,13 @@ contextBridge.exposeInMainWorld('eva', {
   getBreakStatus: () => ipcRenderer.invoke('break:getStatus'),
   changePassword: (currentPassword, newPassword) =>
     ipcRenderer.invoke('auth:changePassword', { currentPassword, newPassword }),
-  setAdminView: (isAdmin) => ipcRenderer.send('ui:setAdminView', isAdmin),
+  setAdminView: (isAdmin) => ipcRenderer.invoke('ui:setAdminView', isAdmin),
+  toggleAdminFullScreen: () => ipcRenderer.invoke('ui:toggleAdminFullScreen'),
+  onWindowMode: (callback) => {
+    const listener = (_event, mode) => callback(mode);
+    ipcRenderer.on('ui:windowMode', listener);
+    return () => ipcRenderer.removeListener('ui:windowMode', listener);
+  },
   admin: {
     listEmployees: () => ipcRenderer.invoke('admin:listEmployees'),
     today: () => ipcRenderer.invoke('admin:today'),

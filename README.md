@@ -130,11 +130,38 @@ Requiere Node.js y npm. Electron es una dependencia de desarrollo y se instala j
 npm run dist
 ```
 
-Genera un instalador de Windows en `dist/EVA Tracker Setup <versión>.exe` (electron-builder + NSIS). El build no está firmado (no hay certificado de firma de código configurado), así que Windows SmartScreen puede mostrar una advertencia la primera vez que se ejecute — eso es esperado para un build interno/sin firmar.
+Genera un instalador de Windows en `dist/EVA-Tracker-Setup-<versión>.exe` (electron-builder + NSIS). El build no está firmado (no hay certificado de firma de código configurado), así que Windows SmartScreen puede mostrar una advertencia la primera vez que se ejecute — eso es esperado para un build interno/sin firmar.
 
 > **Detalle específico de Windows:** el paso de empaquetado NSIS de electron-builder necesita extraer un archivo auxiliar que contiene symlinks, lo cual requiere tener el **Modo de desarrollador** activado (Configuración → Privacidad y seguridad → Para desarrolladores) o ejecutar el build desde una terminal **elevada (Administrador)**. Es un ajuste de entorno de una sola vez, no un error del proyecto.
 
 `dist/` está en `.gitignore` — el instalador es un artefacto de build, no algo que se deba subir al repositorio. Se puede regenerar en cualquier momento con el comando de arriba.
+
+## Publicar una versión nueva (CI/CD)
+
+El despliegue continuo lo maneja `.gitlab-ci.yml`. Publicar una versión es únicamente empujar un tag:
+
+```bash
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+Eso y nada más: ningún push a una rama, merge request o pipeline manual dispara una publicación. El pipeline entonces
+
+1. compila el instalador de Windows en un runner Docker/Linux (imagen `electronuserland/builder:20-wine`, que trae Node y Wine — electron-builder necesita Wine para grabarle el ícono y la versión al `.exe` y para generar el desinstalador);
+2. sincroniza la versión de `package.json` con el tag, porque es la que `app.getVersion()` y el updater comparan;
+3. sube el `.exe`, su `.blockmap` y `latest.yml` al **Package Registry** genérico de este proyecto, siempre a la misma carpeta `eva-tracker/latest` (el `latest.yml` se sobrescribe, los instaladores quedan versionados por nombre de archivo);
+4. crea el Release de GitLab con el enlace de descarga.
+
+Cada copia instalada consulta ese registry al arrancar y luego cada 4 horas, se descarga la versión nueva en segundo plano y la instala **en silencio** la próxima vez que el usuario abre la app desde la bandeja. Los empleados no tienen que hacer nada.
+
+### Dos requisitos que hay que respetar
+
+- **El proyecto de GitLab tiene que ser público**, o el registry no se puede leer sin credenciales y las actualizaciones nunca llegarán. Si tiene que ser privado, hay que asignar un token en el proceso principal — `autoUpdater.requestHeaders = { 'DEPLOY-TOKEN': '…' }` — porque un token puesto en `build.publish` sí se escribe en `app-update.yml` pero **nunca se lee** en tiempo de ejecución.
+- **El instalador es one-click y por usuario** (`nsis.oneClick: true`, `perMachine: false`), y así tiene que quedarse. Es la única configuración en la que una actualización silenciosa nunca levanta un cuadro de UAC: con el instalador asistido anterior, cualquier equipo donde alguien hubiera elegido «para todos los usuarios» pedía permisos de administrador en cada actualización, lo cual rompe justamente lo de que sea silenciosa. Como efecto colateral, la app se instala en `%LOCALAPPDATA%\Programs` y ya no se puede elegir la carpeta.
+
+Las demás advertencias para quien edite `package.json` (nombres de archivo sin espacios, no agregar `publisherName` mientras el build no esté firmado) están comentadas al inicio de `.gitlab-ci.yml`.
+
+`.github/workflows/release.yml` quedó desactivado (solo `workflow_dispatch`): si siguiera disparándose con los mismos tags, competiría con el pipeline de GitLab y publicaría en un lugar donde la app no busca actualizaciones.
 
 ## Regenerar los íconos de la app y la bandeja
 
@@ -143,7 +170,8 @@ Genera un instalador de Windows en `dist/EVA Tracker Setup <versión>.exe` (elec
 ## Roadmap
 
 Esta es intencionalmente una v1 delgada. Ya construido: backend real (Postgres + Express + JWT) reemplazando el almacenamiento local en JSON, con cuentas de múltiples usuarios y roles (empleado/admin). Próximos pasos conocidos, todavía no construidos:
-- CI/CD para desplegar `server/` automáticamente al hacer push (hoy el despliegue al VPS es manual).
+- CI/CD para desplegar `server/` automáticamente al hacer push (hoy el despliegue al VPS es manual; el pipeline actual solo publica la app de escritorio).
+- Firmar el instalador de Windows con un certificado, para que SmartScreen deje de advertir en la primera instalación.
 - Proyectos/etiquetas por cada registro de tiempo.
 - Reportes más ricos (hoy el export de admin es CSV plano).
 - Detección de inactividad o niveles de actividad, si esto necesita competir con herramientas como Hubstaff/Insightful en ese aspecto.
